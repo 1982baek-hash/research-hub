@@ -1,0 +1,742 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>모닝 증권 리포트 허브 · 국내 60개 증권사 리서치 런치패드</title>
+  <script src="https://cdn.tailwindcss.com/3.4.17"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Noto+Sans+KR:wght@400;500;600;700&display=swap" rel="stylesheet" />
+  <style>
+    body {
+      font-family: 'Inter', 'Noto Sans KR', -apple-system, BlinkMacSystemFont, sans-serif;
+      background-color: #f8fafc;
+      color: #0f172a;
+    }
+    .tab-btn[aria-selected="true"] {
+      background-color: #0f766e;
+      color: #ffffff;
+      border-color: #0f766e;
+    }
+    .pill-btn[aria-pressed="true"] {
+      background-color: #0f172a;
+      color: #ffffff;
+      border-color: #0f172a;
+    }
+  </style>
+</head>
+<body class="min-h-screen antialiased">
+  <!-- Toast notification -->
+  <div id="toast" role="status" aria-live="polite" class="fixed bottom-5 right-5 z-50 hidden rounded-xl bg-slate-900 px-4 py-3 text-sm font-medium text-white shadow-lg transition-opacity"></div>
+
+  <div class="mx-auto max-w-7xl px-4 py-6 sm:px-6 lg:px-8">
+    <!-- Header -->
+    <header class="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
+      <div class="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+        <div>
+          <div class="flex flex-wrap items-center gap-2 text-xs font-semibold text-teal-800">
+            <span class="rounded-full bg-teal-50 px-2.5 py-1 border border-teal-200">KOFIA 정회원 60개사 기준</span>
+            <span class="rounded-full bg-slate-100 px-2.5 py-1 text-slate-700">주요 발간 시간: 평일 07:00 ~ 09:00</span>
+          </div>
+          <h1 class="mt-2 text-2xl font-bold tracking-tight text-slate-900 sm:text-3xl">모닝 증권 리포트 허브</h1>
+          <p class="mt-1 text-sm text-slate-600">
+            네이버 증권 리서치(전체 카테고리 · 16개사 통합)와 미제공 4개사(넥스트 · 리딩 · 유화 · 토스증권)를 한 화면에서 바로 열고 오늘의 확인 현황을 관리하세요.
+          </p>
+        </div>
+
+        <div class="flex flex-wrap items-center gap-3">
+          <div class="rounded-xl border border-slate-200 bg-slate-50 px-4 py-2.5">
+            <div class="text-xs font-medium text-slate-500">핵심 창구 확인</div>
+            <div id="core-progress-text" class="text-lg font-bold text-teal-700">0 / 5</div>
+          </div>
+          <div class="rounded-xl border border-slate-200 bg-slate-50 px-4 py-2.5">
+            <div class="text-xs font-medium text-slate-500">무료 공개 21개사</div>
+            <div id="all-progress-text" class="text-lg font-bold text-slate-900">0 / 21</div>
+          </div>
+          <button id="reset-checks-btn" type="button" class="rounded-xl border border-slate-300 bg-white px-3.5 py-2.5 text-sm font-medium text-slate-700 hover:bg-slate-50 active:bg-slate-100">
+            오늘 체크 초기화
+          </button>
+        </div>
+      </div>
+
+      <!-- Progress bar -->
+      <div class="mt-5">
+        <div class="flex items-center justify-between text-xs text-slate-500 mb-1.5">
+          <span>오늘의 모닝 리포트 루틴 진행률 (핵심 5개 창구 기준)</span>
+          <span id="core-progress-pct">0%</span>
+        </div>
+        <div class="h-2 w-full overflow-hidden rounded-full bg-slate-100">
+          <div id="core-progress-bar" class="h-full rounded-full bg-teal-600 transition-all duration-300" style="width: 0%"></div>
+        </div>
+      </div>
+
+      <!-- Navigation Tabs -->
+      <nav class="mt-6 flex flex-wrap gap-2 border-t border-slate-100 pt-4" aria-label="화면 전환">
+        <button id="tab-launchpad" type="button" role="tab" aria-selected="true" class="tab-btn rounded-xl border border-slate-200 px-4 py-2 text-sm font-semibold transition">
+          모닝 런치패드 (핵심 창구)
+        </button>
+        <button id="tab-free21" type="button" role="tab" aria-selected="false" class="tab-btn rounded-xl border border-slate-200 bg-white px-4 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50 transition">
+          무료 공개 21개사 &amp; 카테고리
+        </button>
+        <button id="tab-directory60" type="button" role="tab" aria-selected="false" class="tab-btn rounded-xl border border-slate-200 bg-white px-4 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50 transition">
+          전체 60개사 현황 &amp; 통계
+        </button>
+      </nav>
+    </header>
+
+    <!-- Main Layout: Content + Sticky Memo Sidebar -->
+    <div class="mt-6 grid grid-cols-1 gap-6 lg:grid-cols-12">
+      <!-- Left/Main Area -->
+      <main class="lg:col-span-8 space-y-6">
+        <!-- VIEW 1: Launchpad -->
+        <section id="view-launchpad" class="space-y-6">
+          <!-- Step 1: Naver Research All Categories -->
+          <div class="rounded-2xl border border-teal-200 bg-white p-6 shadow-sm">
+            <div class="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+              <div>
+                <span class="inline-flex items-center rounded-md bg-teal-50 px-2 py-0.5 text-xs font-semibold text-teal-800">1단계 · 통합 수집 창구 (16개사 커버)</span>
+                <h2 class="mt-1.5 text-lg font-bold text-slate-900">네이버 증권 리서치 (전체 카테고리)</h2>
+                <p class="mt-1 text-sm text-slate-600">
+                  데일리 · 국내종목 · 산업분석 · 투자전략 · 경제분석 · 채권분석 등 모든 카테고리가 좌측 메뉴에 모여 있습니다.
+                </p>
+              </div>
+              <div class="flex flex-wrap gap-2 shrink-0">
+                <button id="copy-core-urls-btn" type="button" class="rounded-xl border border-slate-300 bg-white px-3 py-2 text-xs font-semibold text-slate-700 hover:bg-slate-50">
+                  핵심 5곳 URL 복사
+                </button>
+                <a href="https://stock.naver.com/research" target="_blank" rel="noopener noreferrer" class="rounded-xl bg-teal-700 px-3.5 py-2 text-xs font-semibold text-white hover:bg-teal-800">
+                  리서치 홈 열기 ↗
+                </a>
+              </div>
+            </div>
+
+            <div class="mt-4 grid grid-cols-1 gap-2.5 sm:grid-cols-3">
+              <a href="https://stock.naver.com/research" target="_blank" rel="noopener noreferrer" class="flex items-center justify-between rounded-xl border border-slate-200 bg-slate-50 px-3.5 py-2.5 text-sm font-medium text-slate-800 hover:border-teal-400 hover:bg-teal-50/40">
+                <span>리서치 홈 (전체 6개 분류)</span>
+                <span class="text-xs text-teal-700">↗</span>
+              </a>
+              <a href="https://stock.naver.com/research/company" target="_blank" rel="noopener noreferrer" class="flex items-center justify-between rounded-xl border border-slate-200 bg-slate-50 px-3.5 py-2.5 text-sm font-medium text-slate-800 hover:border-teal-400 hover:bg-teal-50/40">
+                <span>국내종목 리포트</span>
+                <span class="text-xs text-teal-700">↗</span>
+              </a>
+              <a href="https://stock.naver.com/research/invest" target="_blank" rel="noopener noreferrer" class="flex items-center justify-between rounded-xl border border-slate-200 bg-slate-50 px-3.5 py-2.5 text-sm font-medium text-slate-800 hover:border-teal-400 hover:bg-teal-50/40">
+                <span>투자전략 리포트</span>
+                <span class="text-xs text-teal-700">↗</span>
+              </a>
+            </div>
+            <div class="mt-3 flex items-center justify-between border-t border-slate-100 pt-3">
+              <span class="text-xs text-slate-500">포함 증권사: DS · 교보 · 다올 · 대신 · 미래에셋 · 삼성 · 상상인 · 신한 · IBK · iM · 유안타 · 유진 · 키움 · 한양 · 한화 · 현대차</span>
+              <label class="inline-flex cursor-pointer items-center gap-2 text-xs font-semibold text-slate-700 shrink-0 ml-3">
+                <input type="checkbox" data-core-id="naver" class="core-check h-4 w-4 rounded border-slate-300 text-teal-700 focus:ring-teal-600" />
+                오늘 확인 완료
+              </label>
+            </div>
+          </div>
+
+          <!-- Step 2: 4 Direct Visit Firms -->
+          <div class="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
+            <div class="flex flex-col gap-1 sm:flex-row sm:items-center sm:justify-between">
+              <div>
+                <span class="inline-flex items-center rounded-md bg-amber-50 px-2 py-0.5 text-xs font-semibold text-amber-800">2단계 · 네이버 미제공 (직접 방문 4개사)</span>
+                <h2 class="mt-1.5 text-lg font-bold text-slate-900">중복되지 않는 무료 공개 증권사</h2>
+              </div>
+              <span class="text-xs text-slate-500">카카오페이증권은 2024.10 이후 신규 게시 중단</span>
+            </div>
+
+            <div id="direct-4-list" class="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-2"></div>
+          </div>
+
+          <!-- Step 3: Optional Telegram / Direct Channels -->
+          <div class="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
+            <span class="inline-flex items-center rounded-md bg-slate-100 px-2 py-0.5 text-xs font-semibold text-slate-700">참고 · 공식 텔레그램 채널 (웹 차단 하우스 보완)</span>
+            <h2 class="mt-1.5 text-lg font-bold text-slate-900">메리츠증권 · 하나증권 공식 리서치 채널</h2>
+            <p class="mt-1 text-sm text-slate-600">웹사이트 메인 접근이 제한되지만 공식 텔레그램에서 당일 PDF 직링크가 공유됩니다.</p>
+            <div class="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-2">
+              <a href="https://t.me/s/meritz_research" target="_blank" rel="noopener noreferrer" class="flex items-center justify-between rounded-xl border border-slate-200 p-4 hover:border-teal-400 hover:bg-slate-50">
+                <div>
+                  <div class="font-semibold text-slate-900">메리츠증권 리서치 텔레그램</div>
+                  <div class="text-xs text-slate-500">t.me/s/meritz_research</div>
+                </div>
+                <span class="text-sm font-semibold text-teal-700">열기 ↗</span>
+              </a>
+              <a href="https://t.me/s/HanaResearch?before=21046" target="_blank" rel="noopener noreferrer" class="flex items-center justify-between rounded-xl border border-slate-200 p-4 hover:border-teal-400 hover:bg-slate-50">
+                <div>
+                  <div class="font-semibold text-slate-900">하나증권 리서치 텔레그램</div>
+                  <div class="text-xs text-slate-500">t.me/s/HanaResearch</div>
+                </div>
+                <span class="text-sm font-semibold text-teal-700">열기 ↗</span>
+              </a>
+            </div>
+          </div>
+        </section>
+
+        <!-- VIEW 2: Free 21 & Categories -->
+        <section id="view-free21" class="hidden space-y-5">
+          <div class="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm space-y-4">
+            <div class="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+              <input id="free21-search" type="search" placeholder="증권사명 또는 카테고리 검색 (예: 토스, 채권, 해외)..." class="w-full sm:w-80 rounded-xl border border-slate-300 px-3.5 py-2 text-sm focus:border-teal-600 focus:outline-none" />
+              <div class="flex flex-wrap gap-1.5">
+                <button type="button" data-source-filter="all" aria-pressed="true" class="pill-btn rounded-lg border border-slate-300 px-3 py-1.5 text-xs font-semibold">전체 (21)</button>
+                <button type="button" data-source-filter="naver" aria-pressed="false" class="pill-btn rounded-lg border border-slate-300 bg-white px-3 py-1.5 text-xs font-semibold text-slate-700">네이버 제공 (16)</button>
+                <button type="button" data-source-filter="direct" aria-pressed="false" class="pill-btn rounded-lg border border-slate-300 bg-white px-3 py-1.5 text-xs font-semibold text-slate-700">직접 방문 (4)</button>
+                <button type="button" data-source-filter="paused" aria-pressed="false" class="pill-btn rounded-lg border border-slate-300 bg-white px-3 py-1.5 text-xs font-semibold text-slate-700">게시 중단 (1)</button>
+              </div>
+            </div>
+
+            <div class="flex flex-wrap items-center gap-1.5 border-t border-slate-100 pt-3">
+              <span class="text-xs font-semibold text-slate-500 mr-1">카테고리:</span>
+              <button type="button" data-cat-filter="all" aria-pressed="true" class="cat-pill pill-btn rounded-lg border border-slate-200 px-2.5 py-1 text-xs font-medium">전체</button>
+              <button type="button" data-cat-filter="데일리" aria-pressed="false" class="cat-pill pill-btn rounded-lg border border-slate-200 bg-white px-2.5 py-1 text-xs font-medium text-slate-700">데일리</button>
+              <button type="button" data-cat-filter="국내종목" aria-pressed="false" class="cat-pill pill-btn rounded-lg border border-slate-200 bg-white px-2.5 py-1 text-xs font-medium text-slate-700">국내종목</button>
+              <button type="button" data-cat-filter="산업분석" aria-pressed="false" class="cat-pill pill-btn rounded-lg border border-slate-200 bg-white px-2.5 py-1 text-xs font-medium text-slate-700">산업분석</button>
+              <button type="button" data-cat-filter="투자전략" aria-pressed="false" class="cat-pill pill-btn rounded-lg border border-slate-200 bg-white px-2.5 py-1 text-xs font-medium text-slate-700">투자전략</button>
+              <button type="button" data-cat-filter="경제분석" aria-pressed="false" class="cat-pill pill-btn rounded-lg border border-slate-200 bg-white px-2.5 py-1 text-xs font-medium text-slate-700">경제분석</button>
+              <button type="button" data-cat-filter="채권분석" aria-pressed="false" class="cat-pill pill-btn rounded-lg border border-slate-200 bg-white px-2.5 py-1 text-xs font-medium text-slate-700">채권분석</button>
+              <button type="button" data-cat-filter="해외·기타" aria-pressed="false" class="cat-pill pill-btn rounded-lg border border-slate-200 bg-white px-2.5 py-1 text-xs font-medium text-slate-700">해외·기타</button>
+            </div>
+          </div>
+
+          <div id="free21-grid" class="grid grid-cols-1 gap-3 sm:grid-cols-2"></div>
+        </section>
+
+        <!-- VIEW 3: Full 60 Directory & Stats -->
+        <section id="view-directory60" class="hidden space-y-6">
+          <div class="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
+            <h2 class="text-lg font-bold text-slate-900">국내 운영 60개 증권사 리포트 접근성 분포</h2>
+            <p class="mt-1 text-sm text-slate-600">금융투자협회 정회원(증권) 60개사 전수 확인 결과</p>
+            <div class="relative mt-4 h-72 w-full">
+              <canvas id="status-chart"></canvas>
+            </div>
+          </div>
+
+          <div class="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm space-y-4">
+            <div class="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+              <input id="dir60-search" type="search" placeholder="60개 증권사 전체 검색..." class="w-full sm:w-72 rounded-xl border border-slate-300 px-3.5 py-2 text-sm focus:border-teal-600 focus:outline-none" />
+              <select id="dir60-filter" aria-label="열람 가능 여부 필터" class="rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm text-slate-700 focus:border-teal-600 focus:outline-none">
+                <option value="all">전체 60개사</option>
+                <option value="free">비로그인 무료 열람 (21)</option>
+                <option value="partial">부분 공개 · 로그인 필요 (6)</option>
+                <option value="inst">기관 · 법인 전용 (19)</option>
+                <option value="none">리서치센터 미운영 (6)</option>
+                <option value="unverified">접속 차단 · 미확인 (8)</option>
+              </select>
+            </div>
+
+            <div class="overflow-x-auto">
+              <table class="w-full border-collapse text-left text-sm">
+                <thead>
+                  <tr class="border-b-2 border-slate-900 text-xs font-semibold text-slate-500">
+                    <th class="py-2.5 pr-3">번호</th>
+                    <th class="py-2.5 pr-3">증권사</th>
+                    <th class="py-2.5 pr-3">상태</th>
+                    <th class="py-2.5">공식 링크 및 확인 근거</th>
+                  </tr>
+                </thead>
+                <tbody id="dir60-tbody" class="divide-y divide-slate-200"></tbody>
+              </table>
+            </div>
+          </div>
+        </section>
+      </main>
+
+      <!-- Right Sidebar: Favorites & Daily Memo -->
+      <aside class="lg:col-span-4 space-y-6">
+        <div class="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+          <div class="flex items-center justify-between">
+            <h2 class="text-base font-bold text-slate-900">고정 즐겨찾기</h2>
+            <span id="fav-count" class="text-xs font-semibold text-teal-700">0곳</span>
+          </div>
+          <p class="mt-1 text-xs text-slate-500">자주 확인하는 증권사에 ★를 눌러 고정하세요.</p>
+          <ul id="fav-list" class="mt-3 space-y-2 text-sm"></ul>
+        </div>
+
+        <div class="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+          <h2 class="text-base font-bold text-slate-900">오늘의 리포트 메모</h2>
+          <p class="mt-1 text-xs text-slate-500">눈에 띄는 종목, 목표주가 변화, 인사이트를 기록해 두세요.</p>
+          <form id="memo-form" class="mt-3 flex gap-2">
+            <input id="memo-input" type="text" placeholder="예: 삼성전자 목표가 상향 (DS투자증권)" class="min-w-0 flex-1 rounded-xl border border-slate-300 px-3 py-2 text-sm focus:border-teal-600 focus:outline-none" />
+            <button type="submit" class="rounded-xl bg-slate-900 px-3.5 py-2 text-sm font-semibold text-white hover:bg-slate-800 shrink-0">추가</button>
+          </form>
+          <ul id="memo-list" class="mt-4 space-y-2"></ul>
+        </div>
+      </aside>
+    </div>
+  </div>
+
+  <script>
+    const FREE_21_FIRMS = [
+      { id: 'ds', name: 'DS투자증권', naver: true, status: 'naver', url: 'https://www.ds-sec.co.kr/bbs/board.php?bo_table=sub03_02', cats: ['국내종목', '산업분석', '투자전략'], note: '기업분석 게시판 2,575건 무료 열람 및 PDF 첨부' },
+      { id: 'kyobo', name: '교보증권', naver: true, status: 'naver', url: 'https://www.iprovest.com/weblogic/RSReportServlet?scr_id=10&menuCode=1&srch_db=0&QU=&DT1=&DT2=&provestz=&pageNum=3', cats: ['데일리', '국내종목', '산업분석', '투자전략', '경제분석'], note: 'PC·모바일 목록 및 PDF 원문 무료 열람' },
+      { id: 'next', name: '넥스트증권', naver: false, status: 'direct', url: 'https://www.next-securities.com/board/boardDetail.do?content=4000194&bbsId=BBSMSTR_000000000241&searchType=&bbsCategory=DR03&searchValue=&nttId=12302', cats: ['국내종목', '투자전략', '해외·기타'], note: '네이버 미제공 · 정기 Report 주간이슈체크 PDF' },
+      { id: 'daol', name: '다올투자증권', naver: true, status: 'naver', url: 'https://www.daolsecurities.com/research/article/common.jspx?rGubun=S01&sctrGubun=S02&web=0', cats: ['데일리', '국내종목', '산업분석', '투자전략'], note: 'Morning Express 및 PDF 파일보기 무료 제공' },
+      { id: 'daishin', name: '대신증권', naver: true, status: 'naver', url: 'https://money2.daishin.com/E5/ResearchCenter/DM_ResearchList.aspx', cats: ['국내종목', '산업분석', '투자전략', '경제분석', '채권분석'], note: '리서치센터 6,736건 목록 및 첨부 PDF 열람' },
+      { id: 'leading', name: '리딩투자증권', naver: false, status: 'direct', url: 'http://www.leading.co.kr/board/EquityResearch/list', cats: ['국내종목'], note: '네이버 미제공 · 기업분석 3,100건 이상 PDF 무료' },
+      { id: 'mirae', name: '미래에셋증권', naver: true, status: 'naver', url: 'https://securities.miraeasset.com/bbs/board/message/list.do?categoryId=1521', cats: ['국내종목', '산업분석', '투자전략', '경제분석', '해외·기타'], note: '자사 리포트 2,551건·글로벌 ETF 무료 열람' },
+      { id: 'samsung', name: '삼성증권', naver: true, status: 'naver', url: 'https://www.samsungpop.com/sscommon/jsp/search/research/research_pop.jsp', cats: ['데일리', '국내종목', '산업분석', '투자전략', '경제분석', '채권분석', '해외·기타'], note: '리서치 탐색기 36,341건 무료 열람' },
+      { id: 'sangsangin', name: '상상인증권', naver: true, status: 'naver', url: 'https://www.sangsanginib.com/research/industryReport/industryReportView', cats: ['국내종목', '산업분석', '투자전략'], note: '전체 885건 목록 및 첨부파일 무료 조회' },
+      { id: 'shinhan', name: '신한투자증권', naver: true, status: 'naver', url: 'https://www.shinhansec.com/siw/insights/research/list/view-popup.do', cats: ['데일리', '국내종목', '산업분석', '투자전략', '해외·기타'], note: '리서치 탐색기 101,916건 및 PDF 버튼 제공' },
+      { id: 'ibk', name: 'IBK투자증권', naver: true, status: 'naver', url: 'https://m.ibks.com/iko/IKO010201.do', cats: ['국내종목', '산업분석', '투자전략', '경제분석', '채권분석', '해외·기타'], note: '전략/시황·기업·경제/채권·해외리서치 무료' },
+      { id: 'im', name: 'iM증권', naver: true, status: 'naver', url: 'https://www.imfnsec.com/mobile/research/rs01.jsp?bid=R_E09&isSmartHi=null', cats: ['데일리', '국내종목', '산업분석', '투자전략', '경제분석', '채권분석', '해외·기타'], note: '해외기업분석·채권분석 포함 786건 무료 열람' },
+      { id: 'yuanta', name: '유안타증권', naver: true, status: 'naver', url: 'https://www.myasset.com/myasset/research/RS_0000000_M.cmd', cats: ['국내종목', '산업분석', '투자전략', '해외·기타'], note: '본문 전체 및 PDF 첨부파일 제한 없이 열람' },
+      { id: 'eugene', name: '유진투자증권', naver: true, status: 'naver', url: 'https://www.eugenefn.com/comm/msgList.do?menu_id=02010401&menu_url=/ingo/igii/igii400&menu_lever=4&board_yn=Y', cats: ['국내종목', '산업분석', '투자전략', '해외·기타'], note: '글로벌전략·기업·산업·해외기업 409건 무료' },
+      { id: 'yuhwa', name: '유화증권', naver: false, status: 'direct', url: 'https://www.yhs.co.kr/board/list/16', cats: ['국내종목', '산업분석'], note: '네이버 미제공 · 기업/산업분석 1,618건 PDF 무료' },
+      { id: 'kakaopay', name: '카카오페이증권', naver: false, status: 'paused', url: 'https://www.kakaopaysec.com/research/industry/dynamicPage.do', cats: ['국내종목', '산업분석', '투자전략'], note: '네이버 미제공 · 2024년 10월 이후 신규 게시 중단' },
+      { id: 'kiwoom', name: '키움증권', naver: true, status: 'naver', url: 'https://www.kiwoom.com/h/invest/research/VAnalCRView?dummyVal=0', cats: ['국내종목', '산업분석', '투자전략', '경제분석', '채권분석', '해외·기타'], note: '해외증시·채권·디지털자산 리서치까지 무료 열람' },
+      { id: 'toss', name: '토스증권', naver: false, status: 'direct', url: 'https://corp.tossinvest.com/ko/investment-info', cats: ['국내종목', '투자전략', '해외·기타'], note: '네이버 미제공 · 인사이트/코멘트 본문 및 PDF 무료' },
+      { id: 'hanyang', name: '한양증권', naver: true, status: 'naver', url: 'https://www.hygood.co.kr/board/00000000-0000-0000-0000-000009000001', cats: ['국내종목', '산업분석'], note: '기업분석 게시판 2,079건 목록 및 PDF 무료' },
+      { id: 'hanwha', name: '한화투자증권', naver: true, status: 'naver', url: 'https://www.hanwhawm.com/main/research/main/list.cmd?depth3_id=anls1&mode=R&templet=default&p', cats: ['데일리', '국내종목', '산업분석', '투자전략'], note: '일간리포트·기업/산업·투자전략 무료 열람' },
+      { id: 'hmsec', name: '현대차증권', naver: true, status: 'naver', url: 'https://www.hmsec.com/mobile/research/research01_view.do?serialNo=35644', cats: ['국내종목', '산업분석', '투자전략'], note: '종목 리포트 본문 및 PDF 보기 무료 제공' }
+    ];
+
+    const ALL_60_FIRMS = [
+      { no: 1, name: 'DB증권', cat: 'partial', label: '부분 공개·고객 중심', url: 'https://www.dbsec.co.kr/main/main.do', desc: '비로그인 공개 게시판 미확인 (보도상 요약 무료·전문 고객 공개)' },
+      { no: 2, name: 'DS투자증권', cat: 'free', label: '무료 열람', url: 'https://www.ds-sec.co.kr/bbs/board.php?bo_table=sub03_02', desc: '기업분석 게시판 비로그인 열람 및 PDF 첨부 확인' },
+      { no: 3, name: 'KB증권', cat: 'partial', label: '부분 공개·로그인', url: 'https://rc.kbsec.com/main.able', desc: '데일리 요약·지표 무료 열람, 원문 PDF는 로그인 페이지 별도 운영' },
+      { no: 4, name: 'NH투자증권', cat: 'partial', label: '계좌 로그인 필요', url: 'https://www.mynamuhbegin.com/', desc: '일반 리포트 계좌보유고객 로그인 필요 (전망 특집만 무료)' },
+      { no: 5, name: '골드만삭스증권 서울지점', cat: 'inst', label: '기관·고객 전용', url: 'https://www.goldmansachs.com/worldwide/korea', desc: 'Client Login 포털 중심 (일부 글로벌 인사이트만 공개)' },
+      { no: 6, name: '교보증권', cat: 'free', label: '무료 열람', url: 'https://www.iprovest.com/weblogic/RSReportServlet?scr_id=10&menuCode=1&srch_db=0&QU=&DT1=&DT2=&provestz=&pageNum=3', desc: 'PC·모바일 목록 및 PDF 원문 비로그인 열람' },
+      { no: 7, name: '나틱시스증권 서울지점', cat: 'inst', label: '기관·고객 전용', url: 'https://apme.cib.natixis.com/south-korea', desc: '개인고객 미영업, 글로벌 OPEN ACCESS 외 로그인 필요' },
+      { no: 8, name: '넥스트증권', cat: 'free', label: '무료 열람', url: 'https://www.next-securities.com/board/boardDetail.do?content=4000194&bbsId=BBSMSTR_000000000241&searchType=&bbsCategory=DR03&searchValue=&nttId=12302', desc: '정기 Report 본문 및 주간이슈체크 PDF 무료 열람' },
+      { no: 9, name: '노무라금융투자', cat: 'inst', label: '기관·고객 전용', url: 'https://www.nomuranow.com/research', desc: '한국 공개 사이트 없음, Nomura Research 로그인 필요' },
+      { no: 10, name: '다올투자증권', cat: 'free', label: '무료 열람', url: 'https://www.daolsecurities.com/research/article/common.jspx?rGubun=S01&sctrGubun=S02&web=0', desc: '투자전략·기업·산업분석·Morning Express 무료 제공' },
+      { no: 11, name: '다이와증권캐피탈마켓코리아', cat: 'inst', label: '기관·법인 전용', url: 'https://www.daiwa-grp.jp/english/about/group/', desc: '한국 별도 사이트 미제공, 해외 계열사 기관 고객 전용' },
+      { no: 12, name: '대신증권', cat: 'free', label: '무료 열람', url: 'https://money2.daishin.com/E5/ResearchCenter/DM_ResearchList.aspx', desc: '리서치센터 목록 및 첨부 PDF 비로그인 열람' },
+      { no: 13, name: '도이치증권', cat: 'inst', label: '기관·고객 전용', url: 'https://investmentbank.db.com/research/', desc: '한국어 페이지 공시만 존재, 글로벌 DB Research 로그인 필요' },
+      { no: 14, name: '리딩투자증권', cat: 'free', label: '무료 열람', url: 'http://www.leading.co.kr/board/EquityResearch/list', desc: '기업분석 3,100건 이상 목록 및 PDF 다운로드 무료' },
+      { no: 15, name: '맥쿼리증권', cat: 'inst', label: '기관·고객 전용', url: 'https://www.macquarie.com/kr/ko.html', desc: '기관 및 기업 고객 전용 명시, Macquarie Insights 로그인 필요' },
+      { no: 16, name: '메리츠증권', cat: 'partial', label: '웹 차단·직링크 열람', url: 'https://t.me/s/meritz_research', desc: '메인 웹 차단, PDF 직링크 및 공식 텔레그램 무료 열람' },
+      { no: 17, name: '메릴린치인터내셔날엘엘씨증권 서울지점', cat: 'inst', label: '기관·고객 전용', url: 'https://business.bofa.com/en-us/content/global-research-about.html', desc: '서울지점 규제 공시만 제공, 글로벌 BofA Mercury 포털 전용' },
+      { no: 18, name: '모간스탠리인터내셔날증권 서울지점', cat: 'inst', label: '기관·고객 전용', url: 'https://www.morganstanley.com/what-we-do/research', desc: '한국 오피스 기관 소개, 글로벌 Matrix Portal 로그인 분리' },
+      { no: 19, name: '미래에셋증권', cat: 'free', label: '무료 열람', url: 'https://securities.miraeasset.com/bbs/board/message/list.do?categoryId=1521', desc: '자사 리서치 2,551건 무료 열람 (타사 제휴 등만 로그인)' },
+      { no: 20, name: '미즈호증권 아시아 서울지점', cat: 'inst', label: '기관·고객 전용', url: 'https://globalresearch.mizuho-sc.com/?lang=en', desc: '아시아 페이지 공개 게시판 없음, Mizuho Research Web 로그인' },
+      { no: 21, name: '부국증권', cat: 'unverified', label: '미색인·미확인', url: 'https://englishdart.fss.or.kr/dsbh001/main.do?rcpNo=20260814002623', desc: '공식 도메인(bookook.co.kr) 검색 색인 부재로 미확인' },
+      { no: 22, name: '비엔케이투자증권', cat: 'unverified', label: '미색인·미확인', url: 'https://www.bnkfg.com/02/03.jsp?dataSeqNo=4689&dataPageNo=57&dataWhere=', desc: '2018년 무료 제공 안내 이력, 현재 도메인 미색인으로 미확인' },
+      { no: 23, name: '비엔피파리바증권', cat: 'inst', label: '기관·법인 전용', url: 'https://www.bnpparibas.co.kr/ko/', desc: '기업 및 기관 금융 중심 메뉴, 일반 리서치 게시판 없음' },
+      { no: 24, name: '삼성증권', cat: 'free', label: '무료 열람', url: 'https://www.samsungpop.com/sscommon/jsp/search/research/research_pop.jsp', desc: '리서치 탐색기 36,341건 및 오늘의 투자정보 무료 열람' },
+      { no: 25, name: '상상인증권', cat: 'free', label: '무료 열람', url: 'https://www.sangsanginib.com/research/industryReport/industryReportView', desc: '산업리포트 등 전체 885건 목록 및 첨부 확인' },
+      { no: 26, name: '신영증권', cat: 'unverified', label: '방화벽 차단·미확인', url: 'https://m.shinyoung.com/index.html?page=00000', desc: '모바일 웹 접속 시 웹 방화벽(WAF) 차단으로 열람 여부 미확인' },
+      { no: 27, name: '신한투자증권', cat: 'free', label: '무료 열람', url: 'https://www.shinhansec.com/siw/insights/research/list/view-popup.do', desc: '리서치 탐색기 101,916건 및 PDF 버튼 비로그인 노출' },
+      { no: 28, name: '씨엠에스증권 한국', cat: 'inst', label: '기관·법인 전용', url: 'https://www.cmschina.com.hk/en/AboutUs/Korea', desc: '한국 법인은 기관투자자 대상, 모회사 리서치는 로그인 필요' },
+      { no: 29, name: '씨지에스 인터내셔널증권 홍콩 한국지점', cat: 'inst', label: '기관·고객 전용', url: 'https://www.cgsi.com/insights?lang=EN', desc: '전용 리서치 포털 접근 거부, 글로벌 일부 인사이트만 공개' },
+      { no: 30, name: '씨티그룹글로벌마켓증권', cat: 'inst', label: '기관·법인 전용', url: 'https://www.citivelocity.com/', desc: 'B2B 기관 대상, Citi Velocity 로그인 및 접근 신청 필요' },
+      { no: 31, name: '씨틱코리아증권', cat: 'inst', label: '기관·고객 전용', url: 'https://www.clsa.com/starrating/', desc: '구 CLSA코리아증권, 리서치 본문 고객 로그인 제한' },
+      { no: 32, name: '아이비케이투자증권', cat: 'free', label: '무료 열람', url: 'https://m.ibks.com/iko/IKO010201.do', desc: '전략·기업·산업·경제/채권·해외리서치 비로그인 다운로드' },
+      { no: 33, name: '아이엔지증권 서울지점', cat: 'none', label: '리서치 미운영', url: 'https://www.ingwb.com/en/network/asia-pacific/south-korea', desc: '국내 주식 리서치 미운영 (글로벌 거시 ING THINK만 무료)' },
+      { no: 34, name: '아이엠증권', cat: 'free', label: '무료 열람', url: 'https://www.imfnsec.com/mobile/research/rs01.jsp?bid=R_E09&isSmartHi=null', desc: '786건 보고서 목록 및 PDF 첨부 비로그인 확인' },
+      { no: 35, name: '에스케이증권', cat: 'unverified', label: '메인 차단·미확인', url: 'https://www.sks.co.kr/data1/research/qna_file/20261027080331709_0_ko.pdf', desc: '메인 웹 차단으로 게시판 UI 미확인 (PDF 직링크 열람은 가능)' },
+      { no: 36, name: '엘에스증권', cat: 'unverified', label: '메인 차단·미확인', url: 'https://ir.ls-sec.co.kr/companykor/overview/business.jsp', desc: '메인 웹 차단으로 게시판 미확인 (IR상 리서치센터 운영 확인)' },
+      { no: 37, name: '우리투자증권', cat: 'none', label: '리서치 미운영', url: 'https://www.wooriib.com/', desc: '공식 홈페이지 내 애널리스트 리서치센터 미설치·미운영' },
+      { no: 38, name: '유비에스증권리미티드 서울지점', cat: 'inst', label: '기관·고객 전용', url: 'https://www.ubs.com/global/en/investment-bank/ubs-neo/investment-research.html', desc: '한국 IB 공개 게시판 없음, UBS Neo 승인 고객 로그인 필수' },
+      { no: 39, name: '유안타증권', cat: 'free', label: '무료 열람', url: 'https://www.myasset.com/myasset/research/RS_0000000_M.cmd', desc: '비로그인 상태에서 본문 전체 및 PDF 첨부파일 제한 없이 열람' },
+      { no: 40, name: '유진투자증권', cat: 'free', label: '무료 열람', url: 'https://www.eugenefn.com/comm/msgList.do?menu_id=02010401&menu_url=/ingo/igii/igii400&menu_lever=4&board_yn=Y', desc: '기업분석 등 409건 목록 및 상세 PDF 비로그인 제공' },
+      { no: 41, name: '유화증권', cat: 'free', label: '무료 열람', url: 'https://www.yhs.co.kr/board/list/16', desc: '기업·산업분석 1,618건 목록 및 PDF 첨부 비로그인 확인' },
+      { no: 42, name: '제이피모간증권 서울지점', cat: 'inst', label: '기관·고객 전용', url: 'https://markets.jpmorgan.com/research-and-insights/global-research', desc: '한국 페이지 게시판 없음, 기관·전문 고객 전용 로그인' },
+      { no: 43, name: '카카오페이증권', cat: 'free', label: '무료(게시 중단)', url: 'https://www.kakaopaysec.com/research/industry/dynamicPage.do', desc: '비로그인 열람 가능하나 2024년 10월 이후 신규 게시 중단' },
+      { no: 44, name: '케이아이디비채권중개', cat: 'unverified', label: '접속 차단·미확인', url: 'http://www.kidb.com/', desc: '공식 도메인 접속 차단으로 리서치 운영 여부 미확인' },
+      { no: 45, name: '케이알투자증권', cat: 'none', label: '리서치 미운영', url: 'https://www.krsec.co.kr/', desc: 'IB·채권·법인영업 등 중심 메뉴, 리서치센터 없음' },
+      { no: 46, name: '케이프투자증권', cat: 'none', label: '리서치 미운영', url: 'https://www.capefn.com/jsp/web/ir/index.jsp', desc: '2022년 11월 리서치사업부 폐지, 홈페이지 메뉴 없음' },
+      { no: 47, name: '코리아에셋투자증권', cat: 'unverified', label: '접속 차단·미확인', url: 'http://www.kasset.co.kr/', desc: '공식 도메인 접속 차단으로 리서치 운영 여부 미확인' },
+      { no: 48, name: '크레디 아그리콜 아시아 증권 서울지점', cat: 'inst', label: '기관·고객 전용', url: 'https://www.ca-cib.com/en/expertise/providing-capital-markets-solutions/global-markets-research', desc: '한국 안내 공개 게시판 없음, 구독 고객 전용 플랫폼 운영' },
+      { no: 49, name: '키움증권', cat: 'free', label: '무료 열람', url: 'https://www.kiwoom.com/h/invest/research/VAnalCRView?dummyVal=0', desc: '국내·해외·채권·디지털자산 리서치 목록 비로그인 조회' },
+      { no: 50, name: '토스증권', cat: 'free', label: '무료 열람', url: 'https://corp.tossinvest.com/ko/investment-info', desc: '인사이트/코멘트 본문 및 PDF 다운로드 비로그인 제공' },
+      { no: 51, name: '하나증권', cat: 'partial', label: '웹 차단·직링크 열람', url: 'https://t.me/s/HanaResearch?before=21046', desc: '메인 웹 차단, PDF 직링크 및 공식 텔레그램 무료 열람' },
+      { no: 52, name: '한국스탠다드차타드증권', cat: 'none', label: '리서치 미운영', url: 'https://www.standardcharteredsecurities.co.kr/', desc: '증권사 리서치 메뉴 없음 (전망 PDF는 SC제일은행 별도 제공)' },
+      { no: 53, name: '한국아이엠씨증권', cat: 'none', label: '리서치 미운영', url: 'https://www.imc.com/us/contact/offices/seoul', desc: '시장조성업무 전담 법인으로 국내 리테일·리서치 미운영' },
+      { no: 54, name: '한국에스지증권', cat: 'inst', label: '기관·법인 전용', url: 'https://www.societegenerale.asia/en/kr/', desc: '개인 미영업 명시, 기업·기관 대상 포털(SG Markets) 운영' },
+      { no: 55, name: '한국투자증권', cat: 'partial', label: '고객·법인 한정', url: 'https://file.truefriend.com/Storage/research/research05/20260429171945530_ko.pdf', desc: '리포트 내 당사 고객 및 별도 서비스 계약 법인에게만 공개 명시' },
+      { no: 56, name: '한양증권', cat: 'free', label: '무료 열람', url: 'https://www.hygood.co.kr/board/00000000-0000-0000-0000-000009000001', desc: '기업분석 게시판 2,079건 목록 및 PDF 첨부 비로그인 확인' },
+      { no: 57, name: '한화투자증권', cat: 'free', label: '무료 열람', url: 'https://www.hanwhawm.com/main/research/main/list.cmd?depth3_id=anls1&mode=R&templet=default&p', desc: '일간·기업·산업·투자전략 비로그인 목록 및 요약 열람' },
+      { no: 58, name: '현대차증권', cat: 'free', label: '무료 열람', url: 'https://www.hmsec.com/mobile/research/research01_view.do?serialNo=35644', desc: '리포트 본문 및 PDF 보기 메뉴 비로그인 접근 가능' },
+      { no: 59, name: '홍콩상하이증권 서울지점', cat: 'inst', label: '기관·법인 전용', url: 'https://www.about.hsbc.co.kr/ko-kr', desc: '기업·금융기관 고객 대상 리서치 제공, 일반 게시판 없음' },
+      { no: 60, name: '흥국증권', cat: 'unverified', label: '미색인·미확인', url: 'https://www.kofia.or.kr/brd/m_96/view.do?seq=42167&srchFr=&srchTo=&srchWord=&srchTp=&multi_itm_seq=0&itm_seq_1=0&itm_seq_2=0&company_cd=&company_nm=', desc: '채용공고상 리서치센터 운영 확인, 홈페이지 미색인으로 미확인' }
+    ];
+
+    const CORE_ITEMS = [
+      { id: 'naver', name: '네이버 증권 리서치', url: 'https://stock.naver.com/research' },
+      { id: 'next', name: '넥스트증권', url: 'https://www.next-securities.com/board/boardDetail.do?content=4000194&bbsId=BBSMSTR_000000000241&searchType=&bbsCategory=DR03&searchValue=&nttId=12302' },
+      { id: 'leading', name: '리딩투자증권', url: 'http://www.leading.co.kr/board/EquityResearch/list' },
+      { id: 'yuhwa', name: '유화증권', url: 'https://www.yhs.co.kr/board/list/16' },
+      { id: 'toss', name: '토스증권', url: 'https://corp.tossinvest.com/ko/investment-info' }
+    ];
+
+    const STORAGE_KEY = 'morning_research_hub_v1';
+
+    function loadState() {
+      try {
+        const raw = localStorage.getItem(STORAGE_KEY);
+        if (raw) return JSON.parse(raw);
+      } catch (e) {}
+      return { checked: {}, favs: ['next', 'toss'], memos: [] };
+    }
+
+    function saveState() {
+      try {
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+      } catch (e) {}
+    }
+
+    let state = loadState();
+    let currentTab = 'launchpad';
+    let sourceFilter = 'all';
+    let catFilter = 'all';
+    let search21 = '';
+    let search60 = '';
+    let filter60 = 'all';
+    let chartInstance = null;
+
+    function showToast(msg) {
+      const toast = document.getElementById('toast');
+      toast.textContent = msg;
+      toast.classList.remove('hidden');
+      clearTimeout(toast._timer);
+      toast._timer = setTimeout(() => toast.classList.add('hidden'), 2400);
+    }
+
+    function updateProgress() {
+      const coreDone = CORE_ITEMS.filter(item => Boolean(state.checked[item.id])).length;
+      const freeDone = FREE_21_FIRMS.filter(f => Boolean(state.checked[f.id])).length;
+      const pct = Math.round((coreDone / CORE_ITEMS.length) * 100);
+
+      document.getElementById('core-progress-text').textContent = `${coreDone} / ${CORE_ITEMS.length}`;
+      document.getElementById('all-progress-text').textContent = `${freeDone} / ${FREE_21_FIRMS.length}`;
+      document.getElementById('core-progress-pct').textContent = `${pct}%`;
+      document.getElementById('core-progress-bar').style.width = `${pct}%`;
+
+      document.querySelectorAll('.core-check').forEach(cb => {
+        const id = cb.getAttribute('data-core-id');
+        cb.checked = Boolean(state.checked[id]);
+      });
+    }
+
+    function renderDirect4() {
+      const container = document.getElementById('direct-4-list');
+      const directFirms = FREE_21_FIRMS.filter(f => f.status === 'direct');
+      container.innerHTML = directFirms.map(f => {
+        const isChecked = Boolean(state.checked[f.id]);
+        const isFav = state.favs.includes(f.id);
+        return `
+          <div class="rounded-xl border ${isChecked ? 'border-teal-300 bg-teal-50/30' : 'border-slate-200 bg-white'} p-4 flex flex-col justify-between gap-3">
+            <div>
+              <div class="flex items-start justify-between gap-2">
+                <div>
+                  <h3 class="font-bold text-slate-900">${f.name}</h3>
+                  <p class="mt-0.5 text-xs text-slate-600">${f.note}</p>
+                </div>
+                <button type="button" data-fav-id="${f.id}" aria-label="즐겨찾기 토글" class="fav-btn text-lg leading-none ${isFav ? 'text-amber-500' : 'text-slate-300 hover:text-amber-400'}">★</button>
+              </div>
+              <div class="mt-2 flex flex-wrap gap-1">
+                ${f.cats.map(c => `<span class="rounded bg-slate-100 px-1.5 py-0.5 text-[11px] font-medium text-slate-600">${c}</span>`).join('')}
+              </div>
+            </div>
+            <div class="flex items-center justify-between border-t border-slate-100 pt-2.5">
+              <label class="inline-flex cursor-pointer items-center gap-1.5 text-xs font-semibold text-slate-700">
+                <input type="checkbox" data-firm-id="${f.id}" ${isChecked ? 'checked' : ''} class="firm-check h-4 w-4 rounded border-slate-300 text-teal-700 focus:ring-teal-600" />
+                확인 완료
+              </label>
+              <a href="${f.url}" target="_blank" rel="noopener noreferrer" class="rounded-lg bg-slate-900 px-3 py-1.5 text-xs font-semibold text-white hover:bg-slate-800">
+                바로가기 ↗
+              </a>
+            </div>
+          </div>
+        `;
+      }).join('');
+    }
+
+    function renderFree21() {
+      const grid = document.getElementById('free21-grid');
+      const q = search21.trim().toLowerCase();
+      const filtered = FREE_21_FIRMS.filter(f => {
+        if (sourceFilter !== 'all' && f.status !== sourceFilter) return false;
+        if (catFilter !== 'all' && !f.cats.includes(catFilter)) return false;
+        if (q) {
+          const hay = `${f.name} ${f.note} ${f.cats.join(' ')}`.toLowerCase();
+          if (!hay.includes(q)) return false;
+        }
+        return true;
+      });
+
+      if (filtered.length === 0) {
+        grid.innerHTML = `<div class="col-span-full rounded-2xl border border-dashed border-slate-300 bg-white p-8 text-center text-sm text-slate-500">조건에 맞는 증권사가 없습니다.</div>`;
+        return;
+      }
+
+      grid.innerHTML = filtered.map(f => {
+        const isChecked = Boolean(state.checked[f.id]);
+        const isFav = state.favs.includes(f.id);
+        let badge = '<span class="rounded-md bg-teal-50 px-2 py-0.5 text-[11px] font-semibold text-teal-800">네이버 제공</span>';
+        if (f.status === 'direct') {
+          badge = '<span class="rounded-md bg-amber-50 px-2 py-0.5 text-[11px] font-semibold text-amber-800">직접 방문 필수</span>';
+        } else if (f.status === 'paused') {
+          badge = '<span class="rounded-md bg-slate-100 px-2 py-0.5 text-[11px] font-semibold text-slate-600">게시 중단</span>';
+        }
+        return `
+          <div class="rounded-2xl border ${isChecked ? 'border-teal-300 bg-teal-50/25' : 'border-slate-200 bg-white'} p-4 shadow-sm flex flex-col justify-between gap-3">
+            <div>
+              <div class="flex items-start justify-between gap-2">
+                <div class="flex items-center gap-2 flex-wrap">
+                  <h3 class="font-bold text-slate-900">${f.name}</h3>
+                  ${badge}
+                </div>
+                <button type="button" data-fav-id="${f.id}" aria-label="즐겨찾기 토글" class="fav-btn text-lg leading-none ${isFav ? 'text-amber-500' : 'text-slate-300 hover:text-amber-400'}">★</button>
+              </div>
+              <p class="mt-1.5 text-xs text-slate-600">${f.note}</p>
+              <div class="mt-2.5 flex flex-wrap gap-1">
+                ${f.cats.map(c => `<span class="rounded bg-slate-100 px-1.5 py-0.5 text-[11px] font-medium text-slate-600">${c}</span>`).join('')}
+              </div>
+            </div>
+            <div class="flex items-center justify-between border-t border-slate-100 pt-2.5">
+              <label class="inline-flex cursor-pointer items-center gap-1.5 text-xs font-semibold text-slate-700">
+                <input type="checkbox" data-firm-id="${f.id}" ${isChecked ? 'checked' : ''} class="firm-check h-4 w-4 rounded border-slate-300 text-teal-700 focus:ring-teal-600" />
+                오늘 확인
+              </label>
+              <a href="${f.url}" target="_blank" rel="noopener noreferrer" class="text-xs font-semibold text-teal-700 hover:text-teal-900">
+                공식 리서치 ↗
+              </a>
+            </div>
+          </div>
+        `;
+      }).join('');
+    }
+
+    function renderDirectory60() {
+      const tbody = document.getElementById('dir60-tbody');
+      const q = search60.trim().toLowerCase();
+      const filtered = ALL_60_FIRMS.filter(f => {
+        if (filter60 !== 'all' && f.cat !== filter60) return false;
+        if (q && !`${f.name} ${f.label} ${f.desc}`.toLowerCase().includes(q)) return false;
+        return true;
+      });
+
+      const badgeColor = {
+        free: 'bg-teal-50 text-teal-800 border-teal-200',
+        partial: 'bg-sky-50 text-sky-800 border-sky-200',
+        inst: 'bg-slate-100 text-slate-700 border-slate-200',
+        none: 'bg-slate-50 text-slate-500 border-slate-200',
+        unverified: 'bg-amber-50 text-amber-800 border-amber-200'
+      };
+
+      tbody.innerHTML = filtered.map(f => `
+        <tr class="hover:bg-slate-50/70">
+          <td class="py-3 pr-3 font-mono text-xs text-slate-400 whitespace-nowrap">${String(f.no).padStart(2, '0')}</td>
+          <td class="py-3 pr-3 font-semibold text-slate-900 whitespace-nowrap">${f.name}</td>
+          <td class="py-3 pr-3 whitespace-nowrap">
+            <span class="inline-block rounded-md border px-2 py-0.5 text-xs font-semibold ${badgeColor[f.cat]}">${f.label}</span>
+          </td>
+          <td class="py-3 text-xs text-slate-600">
+            <div>${f.desc}</div>
+            <a href="${f.url}" target="_blank" rel="noopener noreferrer" class="mt-0.5 inline-block font-medium text-teal-700 hover:underline">확인 출처 열기 ↗</a>
+          </td>
+        </tr>
+      `).join('');
+    }
+
+    function renderChart() {
+      const ctx = document.getElementById('status-chart');
+      if (!ctx || typeof Chart === 'undefined') return;
+      if (chartInstance) chartInstance.destroy();
+      chartInstance = new Chart(ctx, {
+        type: 'bar',
+        data: {
+          labels: ['비로그인 무료 열람', '기관·법인 전용', '접속 차단·미확인', '부분 공개·로그인', '리서치센터 미운영'],
+          datasets: [{
+            label: '증권사 수 (개사)',
+            data: [21, 19, 8, 6, 6],
+            backgroundColor: ['#0f766e', '#334155', '#d97706', '#0284c7', '#94a3b8'],
+            borderRadius: 6
+          }]
+        },
+        options: {
+          indexAxis: 'y',
+          responsive: true,
+          maintainAspectRatio: false,
+          plugins: {
+            legend: { display: false }
+          },
+          scales: {
+            x: { beginAtZero: true, max: 25, ticks: { stepSize: 5 } }
+          }
+        }
+      });
+    }
+
+    function renderFavorites() {
+      const list = document.getElementById('fav-list');
+      const count = document.getElementById('fav-count');
+      const favFirms = FREE_21_FIRMS.filter(f => state.favs.includes(f.id));
+      count.textContent = `${favFirms.length}곳`;
+      if (favFirms.length === 0) {
+        list.innerHTML = '<li class="text-xs text-slate-400">고정된 증권사가 없습니다.</li>';
+        return;
+      }
+      list.innerHTML = favFirms.map(f => `
+        <li class="flex items-center justify-between rounded-xl border border-slate-200 bg-slate-50 px-3 py-2">
+          <a href="${f.url}" target="_blank" rel="noopener noreferrer" class="font-medium text-slate-800 hover:text-teal-700">${f.name} ↗</a>
+          <button type="button" data-fav-id="${f.id}" class="fav-btn text-xs text-slate-400 hover:text-rose-600">해제</button>
+        </li>
+      `).join('');
+    }
+
+    function renderMemos() {
+      const list = document.getElementById('memo-list');
+      if (state.memos.length === 0) {
+        list.innerHTML = '<li class="text-xs text-slate-400">아직 작성된 메모가 없습니다.</li>';
+        return;
+      }
+      list.innerHTML = state.memos.map((m, idx) => `
+        <li class="flex items-start justify-between gap-2 rounded-xl border border-slate-200 bg-slate-50 p-2.5 text-xs text-slate-700">
+          <div>
+            <div class="font-medium text-slate-900">${m.text.replace(/</g, '&lt;')}</div>
+            <div class="mt-0.5 text-[11px] text-slate-400">${m.time}</div>
+          </div>
+          <button type="button" data-memo-idx="${idx}" class="del-memo-btn text-slate-400 hover:text-rose-600 shrink-0">삭제</button>
+        </li>
+      `).join('');
+    }
+
+    function switchTab(tab) {
+      currentTab = tab;
+      document.getElementById('view-launchpad').classList.toggle('hidden', tab !== 'launchpad');
+      document.getElementById('view-free21').classList.toggle('hidden', tab !== 'free21');
+      document.getElementById('view-directory60').classList.toggle('hidden', tab !== 'directory60');
+
+      document.getElementById('tab-launchpad').setAttribute('aria-selected', String(tab === 'launchpad'));
+      document.getElementById('tab-free21').setAttribute('aria-selected', String(tab === 'free21'));
+      document.getElementById('tab-directory60').setAttribute('aria-selected', String(tab === 'directory60'));
+
+      if (tab === 'directory60') renderChart();
+    }
+
+    // Event bindings
+    document.getElementById('tab-launchpad').addEventListener('click', () => switchTab('launchpad'));
+    document.getElementById('tab-free21').addEventListener('click', () => switchTab('free21'));
+    document.getElementById('tab-directory60').addEventListener('click', () => switchTab('directory60'));
+
+    document.getElementById('reset-checks-btn').addEventListener('click', () => {
+      state.checked = {};
+      saveState();
+      updateProgress();
+      renderDirect4();
+      renderFree21();
+      showToast('오늘의 확인 체크를 초기화했습니다.');
+    });
+
+    document.getElementById('copy-core-urls-btn').addEventListener('click', () => {
+      const text = CORE_ITEMS.map(i => `${i.name}: ${i.url}`).join('\n');
+      if (navigator.clipboard && navigator.clipboard.writeText) {
+        navigator.clipboard.writeText(text).then(() => showToast('핵심 5곳 URL을 클립보드에 복사했습니다.')).catch(() => fallbackCopy(text));
+      } else {
+        fallbackCopy(text);
+      }
+    });
+
+    function fallbackCopy(text) {
+      const ta = document.createElement('textarea');
+      ta.value = text;
+      document.body.appendChild(ta);
+      ta.select();
+      try {
+        document.execCommand('copy');
+        showToast('핵심 5곳 URL을 클립보드에 복사했습니다.');
+      } catch (e) {
+        showToast('복사에 실패했습니다.');
+      }
+      document.body.removeChild(ta);
+    }
+
+    document.addEventListener('change', (e) => {
+      if (e.target.classList.contains('core-check')) {
+        const id = e.target.getAttribute('data-core-id');
+        state.checked[id] = e.target.checked;
+        saveState();
+        updateProgress();
+      } else if (e.target.classList.contains('firm-check')) {
+        const id = e.target.getAttribute('data-firm-id');
+        state.checked[id] = e.target.checked;
+        saveState();
+        updateProgress();
+        renderDirect4();
+        renderFree21();
+      }
+    });
+
+    document.addEventListener('click', (e) => {
+      const favBtn = e.target.closest('.fav-btn');
+      if (favBtn) {
+        const id = favBtn.getAttribute('data-fav-id');
+        if (state.favs.includes(id)) {
+          state.favs = state.favs.filter(x => x !== id);
+        } else {
+          state.favs.push(id);
+        }
+        saveState();
+        renderDirect4();
+        renderFree21();
+        renderFavorites();
+        return;
+      }
+
+      const delMemo = e.target.closest('.del-memo-btn');
+      if (delMemo) {
+        const idx = Number(delMemo.getAttribute('data-memo-idx'));
+        state.memos.splice(idx, 1);
+        saveState();
+        renderMemos();
+      }
+    });
+
+    document.querySelectorAll('[data-source-filter]').forEach(btn => {
+      btn.addEventListener('click', () => {
+        sourceFilter = btn.getAttribute('data-source-filter');
+        document.querySelectorAll('[data-source-filter]').forEach(b => b.setAttribute('aria-pressed', String(b === btn)));
+        renderFree21();
+      });
+    });
+
+    document.querySelectorAll('[data-cat-filter]').forEach(btn => {
+      btn.addEventListener('click', () => {
+        catFilter = btn.getAttribute('data-cat-filter');
+        document.querySelectorAll('[data-cat-filter]').forEach(b => b.setAttribute('aria-pressed', String(b === btn)));
+        renderFree21();
+      });
+    });
+
+    document.getElementById('free21-search').addEventListener('input', (e) => {
+      search21 = e.target.value;
+      renderFree21();
+    });
+
+    document.getElementById('dir60-search').addEventListener('input', (e) => {
+      search60 = e.target.value;
+      renderDirectory60();
+    });
+
+    document.getElementById('dir60-filter').addEventListener('change', (e) => {
+      filter60 = e.target.value;
+      renderDirectory60();
+    });
+
+    document.getElementById('memo-form').addEventListener('submit', (e) => {
+      e.preventDefault();
+      const input = document.getElementById('memo-input');
+      const val = input.value.trim();
+      if (!val) return;
+      const now = new Date();
+      const timeStr = `${now.getMonth() + 1}/${now.getDate()} ${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`;
+      state.memos.unshift({ text: val, time: timeStr });
+      input.value = '';
+      saveState();
+      renderMemos();
+    });
+
+    // Initial render
+    updateProgress();
+    renderDirect4();
+    renderFree21();
+    renderDirectory60();
+    renderFavorites();
+    renderMemos();
+  </script>
+</body>
+</html>
