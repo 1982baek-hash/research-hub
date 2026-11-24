@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>모닝 증권 리포트 허브 · 국내 60개 증권사 리서치 런치패드</title>
+  <title>리포트 조회 · 모닝 증권 리포트 허브</title>
   <script src="https://cdn.tailwindcss.com/3.4.17"></script>
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
   <link rel="preconnect" href="https://fonts.googleapis.com" />
@@ -25,6 +25,13 @@
       color: #ffffff;
       border-color: #0f172a;
     }
+    .feed-cat-btn[aria-pressed="true"] {
+      background-color: #eff6ff;
+      color: #1d4ed8;
+      border-color: #3b82f6;
+      font-weight: 700;
+      z-index: 10;
+    }
   </style>
 </head>
 <body class="min-h-screen antialiased">
@@ -42,7 +49,7 @@
           </div>
           <h1 class="mt-2 text-2xl font-bold tracking-tight text-slate-900 sm:text-3xl">모닝 증권 리포트 허브</h1>
           <p class="mt-1 text-sm text-slate-600">
-            네이버 증권 리서치(전체 카테고리 · 16개사 통합)와 미제공 4개사(넥스트 · 리딩 · 유화 · 토스증권)를 한 화면에서 바로 열고 오늘의 확인 현황을 관리하세요.
+            올라온 순서대로 최신 증권사 리포트를 한눈에 조회하고, 네이버 증권(16개사) + 미제공 4개사(넥스트·리딩·유화·토스증권) 루틴을 관리하세요.
           </p>
         </div>
 
@@ -74,7 +81,10 @@
 
       <!-- Navigation Tabs -->
       <nav class="mt-6 flex flex-wrap gap-2 border-t border-slate-100 pt-4" aria-label="화면 전환">
-        <button id="tab-launchpad" type="button" role="tab" aria-selected="true" class="tab-btn rounded-xl border border-slate-200 px-4 py-2 text-sm font-semibold transition">
+        <button id="tab-feed" type="button" role="tab" aria-selected="true" class="tab-btn rounded-xl border border-slate-200 px-4 py-2 text-sm font-semibold transition">
+          리포트 조회 (최신순)
+        </button>
+        <button id="tab-launchpad" type="button" role="tab" aria-selected="false" class="tab-btn rounded-xl border border-slate-200 bg-white px-4 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50 transition">
           모닝 런치패드 (핵심 창구)
         </button>
         <button id="tab-free21" type="button" role="tab" aria-selected="false" class="tab-btn rounded-xl border border-slate-200 bg-white px-4 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50 transition">
@@ -86,13 +96,113 @@
       </nav>
     </header>
 
-    <!-- Main Layout: Content + Sticky Memo Sidebar -->
+    <!-- Main Layout -->
     <div class="mt-6 grid grid-cols-1 gap-6 lg:grid-cols-12">
-      <!-- Left/Main Area -->
       <main class="lg:col-span-8 space-y-6">
+
+        <!-- VIEW 0 (DEFAULT): Report Feed (올라온 순서대로 리포트 조회) -->
+        <section id="view-feed" class="space-y-4">
+          <!-- Top Filter Card matching reference design -->
+          <div class="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+            <div class="flex flex-col gap-5 xl:flex-row xl:items-center">
+              <!-- 2x3 Category Grid -->
+              <div class="grid grid-cols-3 shrink-0 overflow-hidden rounded-xl border border-slate-200">
+                <button type="button" data-feed-cat="전체" aria-pressed="true" class="feed-cat-btn border-b border-r border-slate-200 bg-white px-5 py-2.5 text-sm font-medium text-slate-700 hover:bg-slate-50">전체</button>
+                <button type="button" data-feed-cat="기업" aria-pressed="false" class="feed-cat-btn border-b border-r border-slate-200 bg-white px-5 py-2.5 text-sm font-medium text-slate-700 hover:bg-slate-50">기업</button>
+                <button type="button" data-feed-cat="산업" aria-pressed="false" class="feed-cat-btn border-b border-slate-200 bg-white px-5 py-2.5 text-sm font-medium text-slate-700 hover:bg-slate-50">산업</button>
+                <button type="button" data-feed-cat="시장" aria-pressed="false" class="feed-cat-btn border-r border-slate-200 bg-white px-5 py-2.5 text-sm font-medium text-slate-700 hover:bg-slate-50">시장</button>
+                <button type="button" data-feed-cat="경제" aria-pressed="false" class="feed-cat-btn border-r border-slate-200 bg-white px-5 py-2.5 text-sm font-medium text-slate-700 hover:bg-slate-50">경제</button>
+                <button type="button" data-feed-cat="파생" aria-pressed="false" class="feed-cat-btn bg-white px-5 py-2.5 text-sm font-medium text-slate-700 hover:bg-slate-50">파생</button>
+              </div>
+
+              <!-- Filter Controls -->
+              <div class="flex-1 space-y-3">
+                <div class="grid grid-cols-1 gap-3 sm:grid-cols-3">
+                  <div>
+                    <label for="feed-date-filter" class="mb-1 block text-xs font-medium text-slate-500">날짜</label>
+                    <select id="feed-date-filter" class="w-full rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm text-slate-800 focus:border-blue-500 focus:outline-none">
+                      <option value="all">전체 기간</option>
+                      <option value="today">오늘 (2026.11.24)</option>
+                      <option value="7d">최근 1주일</option>
+                      <option value="30d">최근 1개월</option>
+                    </select>
+                  </div>
+                  <div>
+                    <label for="feed-opinion-filter" class="mb-1 block text-xs font-medium text-slate-500">투자의견</label>
+                    <select id="feed-opinion-filter" class="w-full rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm text-slate-800 focus:border-blue-500 focus:outline-none">
+                      <option value="all">전체</option>
+                      <option value="buy">Buy / 매수</option>
+                      <option value="none">의견없음 / 전략</option>
+                    </select>
+                  </div>
+                  <div>
+                    <label for="feed-issuer-filter" class="mb-1 block text-xs font-medium text-slate-500">발행기관</label>
+                    <select id="feed-issuer-filter" class="w-full rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm text-slate-800 focus:border-blue-500 focus:outline-none">
+                      <option value="all">전체</option>
+                    </select>
+                  </div>
+                </div>
+
+                <form id="feed-search-form" class="grid grid-cols-1 gap-3 sm:grid-cols-12 sm:items-end">
+                  <div class="sm:col-span-4">
+                    <label for="feed-stock-input" class="mb-1 block text-xs font-medium text-slate-500">종목검색</label>
+                    <input id="feed-stock-input" type="text" placeholder="코드·종목명" class="w-full rounded-xl border border-slate-300 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none" />
+                  </div>
+                  <div class="sm:col-span-8">
+                    <label for="feed-query-input" class="mb-1 block text-xs font-medium text-slate-500">검색</label>
+                    <div class="flex gap-2">
+                      <select id="feed-query-scope" aria-label="검색 대상" class="rounded-xl border border-slate-300 bg-white px-2.5 py-2 text-sm text-slate-700 focus:border-blue-500 focus:outline-none">
+                        <option value="all">전체</option>
+                        <option value="title">제목</option>
+                        <option value="issuer">발행기관</option>
+                      </select>
+                      <input id="feed-query-input" type="text" placeholder="검색어를 입력하세요." class="min-w-0 flex-1 rounded-xl border border-slate-300 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none" />
+                      <button type="submit" class="rounded-xl bg-blue-700 px-4 py-2 text-sm font-semibold text-white hover:bg-blue-800 shrink-0">검색</button>
+                    </div>
+                  </div>
+                </form>
+              </div>
+            </div>
+          </div>
+
+          <!-- Feed Toolbar -->
+          <div class="flex flex-wrap items-center justify-between gap-2 px-1">
+            <div class="text-xs text-slate-500">
+              총 <span id="feed-count" class="font-bold text-slate-900">0</span>건 (2026.11.24 수집 기준 최신순 · 행 클릭 시 원문 창구 이동)
+            </div>
+            <div class="flex items-center gap-2">
+              <button id="open-add-report-btn" type="button" class="rounded-lg border border-slate-300 bg-white px-3 py-1.5 text-xs font-semibold text-slate-700 hover:bg-slate-50">
+                + 리포트 추가
+              </button>
+              <select id="feed-limit-select" aria-label="표시 개수" class="rounded-lg border border-slate-300 bg-white px-2.5 py-1.5 text-xs font-medium text-slate-700 focus:outline-none">
+                <option value="20">20개 단위</option>
+                <option value="50" selected>50개 단위</option>
+                <option value="100">100개 단위</option>
+              </select>
+            </div>
+          </div>
+
+          <!-- Feed Table -->
+          <div class="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
+            <div class="overflow-x-auto">
+              <table class="w-full border-collapse text-left text-sm">
+                <thead>
+                  <tr class="border-b border-slate-200 bg-slate-50/70 text-xs font-semibold text-slate-500">
+                    <th class="py-3 pl-4 pr-3">제목</th>
+                    <th class="py-3 px-3 text-right whitespace-nowrap">목표주가</th>
+                    <th class="py-3 px-3 whitespace-nowrap">투자의견</th>
+                    <th class="py-3 px-3 whitespace-nowrap">발행기관</th>
+                    <th class="py-3 pl-3 pr-4 text-right whitespace-nowrap">발표일</th>
+                  </tr>
+                </thead>
+                <tbody id="feed-tbody" class="divide-y divide-slate-100"></tbody>
+              </table>
+            </div>
+          </div>
+        </section>
+
         <!-- VIEW 1: Launchpad -->
-        <section id="view-launchpad" class="space-y-6">
-          <!-- Step 1: Naver Research All Categories -->
+        <section id="view-launchpad" class="hidden space-y-6">
           <div class="rounded-2xl border border-teal-200 bg-white p-6 shadow-sm">
             <div class="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
               <div>
@@ -135,7 +245,6 @@
             </div>
           </div>
 
-          <!-- Step 2: 4 Direct Visit Firms -->
           <div class="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
             <div class="flex flex-col gap-1 sm:flex-row sm:items-center sm:justify-between">
               <div>
@@ -148,7 +257,6 @@
             <div id="direct-4-list" class="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-2"></div>
           </div>
 
-          <!-- Step 3: Optional Telegram / Direct Channels -->
           <div class="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
             <span class="inline-flex items-center rounded-md bg-slate-100 px-2 py-0.5 text-xs font-semibold text-slate-700">참고 · 공식 텔레그램 채널 (웹 차단 하우스 보완)</span>
             <h2 class="mt-1.5 text-lg font-bold text-slate-900">메리츠증권 · 하나증권 공식 리서치 채널</h2>
@@ -265,7 +373,98 @@
     </div>
   </div>
 
+  <!-- Add Report Modal -->
+  <div id="add-report-modal" class="fixed inset-0 z-50 hidden items-center justify-center bg-slate-900/40 p-4">
+    <div class="w-full max-w-md rounded-2xl bg-white p-6 shadow-xl">
+      <div class="flex items-center justify-between">
+        <h3 class="text-base font-bold text-slate-900">리포트 직접 추가</h3>
+        <button id="close-add-report-btn" type="button" class="text-sm text-slate-400 hover:text-slate-700">닫기</button>
+      </div>
+      <form id="add-report-form" class="mt-4 space-y-3">
+        <div class="grid grid-cols-2 gap-3">
+          <div>
+            <label for="new-cat" class="mb-1 block text-xs font-medium text-slate-600">분류</label>
+            <select id="new-cat" class="w-full rounded-xl border border-slate-300 px-3 py-2 text-sm">
+              <option value="기업">기업</option>
+              <option value="산업">산업</option>
+              <option value="시장">시장</option>
+              <option value="경제">경제</option>
+              <option value="파생">파생</option>
+            </select>
+          </div>
+          <div>
+            <label for="new-date" class="mb-1 block text-xs font-medium text-slate-600">발표일</label>
+            <input id="new-date" type="text" value="2026.11.24" required class="w-full rounded-xl border border-slate-300 px-3 py-2 text-sm" />
+          </div>
+        </div>
+        <div>
+          <label for="new-title" class="mb-1 block text-xs font-medium text-slate-600">제목 (종목명 포함)</label>
+          <input id="new-title" type="text" required placeholder="예: 삼성전자 - HBM 공급 확대" class="w-full rounded-xl border border-slate-300 px-3 py-2 text-sm" />
+        </div>
+        <div class="grid grid-cols-3 gap-2">
+          <div>
+            <label for="new-target" class="mb-1 block text-xs font-medium text-slate-600">목표주가</label>
+            <input id="new-target" type="text" placeholder="-" class="w-full rounded-xl border border-slate-300 px-3 py-2 text-sm" />
+          </div>
+          <div>
+            <label for="new-opinion" class="mb-1 block text-xs font-medium text-slate-600">투자의견</label>
+            <input id="new-opinion" type="text" placeholder="Buy" class="w-full rounded-xl border border-slate-300 px-3 py-2 text-sm" />
+          </div>
+          <div>
+            <label for="new-issuer" class="mb-1 block text-xs font-medium text-slate-600">발행기관</label>
+            <input id="new-issuer" type="text" required placeholder="증권사명" class="w-full rounded-xl border border-slate-300 px-3 py-2 text-sm" />
+          </div>
+        </div>
+        <div>
+          <label for="new-url" class="mb-1 block text-xs font-medium text-slate-600">링크 URL</label>
+          <input id="new-url" type="url" value="https://stock.naver.com/research" required class="w-full rounded-xl border border-slate-300 px-3 py-2 text-sm" />
+        </div>
+        <div class="flex justify-end gap-2 pt-2">
+          <button type="submit" class="rounded-xl bg-blue-700 px-4 py-2 text-sm font-semibold text-white hover:bg-blue-800">목록에 추가</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
   <script>
+    const INITIAL_REPORTS = [
+      { cat: '기업', stock: 'HL홀딩스', title: 'HL홀딩스 — 지분법 쇼크는 비현금성, 배당수익률은 7%', target: '40,000', opinion: 'Buy', issuer: '하나증권', date: '2026.11.24', url: 'https://stock.naver.com/research/company/98443' },
+      { cat: '기업', stock: 'LG유플러스', title: 'LG유플러스 — 12월 전략 - 내년엔 2만원까지는 오를 것입니다', target: '20,000', opinion: 'Buy', issuer: '하나증권', date: '2026.11.24', url: 'https://stock.naver.com/research/company' },
+      { cat: '기업', stock: 'SK텔레콤', title: 'SK텔레콤 — 12월 전략 - 7만원 매수는 엄청난 기회입니다', target: '140,000', opinion: 'Buy', issuer: '하나증권', date: '2026.11.24', url: 'https://stock.naver.com/research/company' },
+      { cat: '기업', stock: 'KT', title: 'KT — 12월 전략 - 단기 호재는 없지만 가격은 너무 쌉니다', target: '76,000', opinion: 'Buy', issuer: '하나증권', date: '2026.11.24', url: 'https://stock.naver.com/research/company' },
+      { cat: '기업', stock: '코미코', title: '코미코 — 투자 부담의 정점 통과, 증설 효과 가시화 국면', target: '23,000', opinion: 'Buy', issuer: '유안타증권', date: '2026.11.24', url: 'https://stock.naver.com/research/company' },
+      { cat: '기업', stock: '감성코퍼레이션', title: '감성코퍼레이션 — 달라질 27년 중국 매장 확대 속도', target: '-', opinion: '-', issuer: '유안타증권', date: '2026.11.24', url: 'https://stock.naver.com/research/company' },
+      { cat: '기업', stock: '한전KPS', title: '한전KPS — 언제나 마무리가 중요하다', target: '48,000', opinion: '매수', issuer: '신한투자증권', date: '2026.11.24', url: 'https://stock.naver.com/research/company' },
+      { cat: '기업', stock: '전진건설로봇', title: '전진건설로봇 — 3Q26 Review: 수익성 개선 긍정적, 매출 회복 기대', target: '48,000', opinion: 'Buy', issuer: '유진투자증권', date: '2026.11.24', url: 'https://stock.naver.com/research/company' },
+      { cat: '기업', stock: '인화정공', title: '인화정공 — 콥데이 후기: 이익률은 오르고, 환원은 늘고', target: '-', opinion: '-', issuer: '신한투자증권', date: '2026.11.24', url: 'https://stock.naver.com/research/company' },
+      { cat: '기업', stock: '세미파이브', title: '세미파이브 — 흑자전환 직전', target: '17,000', opinion: '매수', issuer: '신한투자증권', date: '2026.11.24', url: 'https://stock.naver.com/research/company' },
+      { cat: '기업', stock: '아모텍', title: '아모텍 — AI 숫자는 탄탄 그 이상', target: '25,000', opinion: '매수', issuer: 'IBK투자증권', date: '2026.11.24', url: 'https://stock.naver.com/research/company' },
+      { cat: '기업', stock: 'KG모빌리티플랫폼', title: 'KG모빌리티플랫폼 — 달라지는 중고차 시장, 준비된 플랫폼', target: '10,000', opinion: '매수', issuer: 'SK증권', date: '2026.11.24', url: 'https://stock.naver.com/research/company' },
+      { cat: '기업', stock: '엘앤씨바이오', title: '엘앤씨바이오 — 리투오 수출 성장 가시성이 높아지는 시점', target: '26,000', opinion: '매수', issuer: 'IBK투자증권', date: '2026.11.24', url: 'https://stock.naver.com/research/company' },
+      { cat: '기업', stock: '하나투어', title: '하나투어 — 내년에는 연휴가 더 많습니다', target: '54,000', opinion: '매수', issuer: 'SK증권', date: '2026.11.24', url: 'https://stock.naver.com/research/company' },
+      { cat: '기업', stock: '엑시콘', title: '엑시콘 — 국산화를 넘어, 대량 공급의 시작', target: '-', opinion: '-', issuer: '키움증권', date: '2026.11.24', url: 'https://stock.naver.com/research/company' },
+      { cat: '기업', stock: '바이오노트', title: '바이오노트 — 본업 성장과 기업가치 재평가 가능성', target: '-', opinion: '-', issuer: '한국IR협의회', date: '2026.11.24', url: 'https://stock.naver.com/research/company' },
+      { cat: '기업', stock: 'CJ ENM', title: 'CJ ENM — 글로벌 IP홀더로의 사업모델 진화', target: '-', opinion: '-', issuer: '한국IR협의회', date: '2026.11.24', url: 'https://stock.naver.com/research/company' },
+      { cat: '시장', stock: '', title: '[급락 코멘트] 여진 마무리 국면. 가격만 공포인 국면', target: '-', opinion: '-', issuer: '한화투자증권', date: '2026.11.24', url: 'https://stock.naver.com/research/invest' },
+      { cat: '파생', stock: '', title: '디지털 자산 Daily', target: '-', opinion: '-', issuer: '유안타증권', date: '2026.11.24', url: 'https://stock.naver.com/research/invest' },
+      { cat: '산업', stock: '', title: '글로벌 테크 - 시장을 구원하러 돌아오다', target: '-', opinion: '-', issuer: '유진투자증권', date: '2026.11.24', url: 'https://stock.naver.com/research/invest' },
+      { cat: '시장', stock: '', title: '반도체 쏠림에서 내수, 한류로 피난(26.11.24)', target: '-', opinion: '-', issuer: '유진투자증권', date: '2026.11.24', url: 'https://stock.naver.com/research/invest' },
+      { cat: '시장', stock: '', title: '기술적 반등 지점 도달, 다음 관문은 추세 반등 근거 확보', target: '-', opinion: '-', issuer: '신한투자증권', date: '2026.11.24', url: 'https://stock.naver.com/research/invest' },
+      { cat: '경제', stock: '', title: '2027 China - 한 박자 쉬고 다시 앞으로', target: '-', opinion: '-', issuer: '유진투자증권', date: '2026.11.24', url: 'https://stock.naver.com/research/invest' },
+      { cat: '시장', stock: '', title: '[IBKS Daily] Start with IBKS(2026.11.24) 젠슨 황 복귀에 AI 반도체 투자심리 회복 기대', target: '-', opinion: '-', issuer: 'IBK투자증권', date: '2026.11.24', url: 'https://stock.naver.com/research/invest' },
+      { cat: '파생', stock: '', title: '뉴 ETF 라인 업 : 글로벌 AI병목 인프라, 글로벌LLM 등 ETF 2종 신규 상장', target: '-', opinion: '-', issuer: '키움증권', date: '2026.11.24', url: 'https://stock.naver.com/research/invest' },
+      { cat: '시장', stock: '', title: '11/24, 실로 대단했던 젠슨황의 엔비디아 CEO 복귀 효과', target: '-', opinion: '-', issuer: '키움증권', date: '2026.11.24', url: 'https://stock.naver.com/research/invest' },
+      { cat: '시장', stock: '', title: '이 주의 투자 포인트 (11월 23일 주)', target: '-', opinion: '-', issuer: '토스증권', date: '2026.11.23', url: 'https://corp.tossinvest.com/ko/investment-info?tab=research-comment' },
+      { cat: '시장', stock: '', title: '이 주의 투자 포인트 (11월 16일 주)', target: '-', opinion: '-', issuer: '토스증권', date: '2026.11.16', url: 'https://corp.tossinvest.com/ko/investment-info?tab=research-comment' },
+      { cat: '기업', stock: '컴투스홀딩스(063080)', title: '컴투스홀딩스(063080) - 3분기 흑자전환 성공', target: '-', opinion: '-', issuer: '유화증권', date: '2026.11.13', url: 'https://www.yhs.co.kr/board/list/16' },
+      { cat: '기업', stock: 'TYM(002900)', title: 'TYM(002900) - 북미 시장에서 확인된 경쟁력', target: '-', opinion: '-', issuer: '유화증권', date: '2026.11.13', url: 'https://www.yhs.co.kr/board/list/16' },
+      { cat: '기업', stock: '컴투스홀딩스(063080)', title: '컴투스홀딩스(063080) - 다층적인 수익 구조 형성', target: '-', opinion: '-', issuer: '유화증권', date: '2026.11.13', url: 'https://www.yhs.co.kr/board/list/16' },
+      { cat: '파생', stock: '', title: '글로벌 헤지펀드 포지션 점검: 급락은 수급, 반등은 아직 숏커버링', target: '-', opinion: '-', issuer: '토스증권', date: '2026.11.12', url: 'https://corp.tossinvest.com/ko/investment-info?tab=research-comment' },
+      { cat: '산업', stock: '', title: '그려봤습니다, AI 밸류체인', target: '-', opinion: '-', issuer: '토스증권', date: '2026.11.11', url: 'https://corp.tossinvest.com/ko/investment-info' },
+      { cat: '경제', stock: '', title: '여기는, 한국입니다', target: '-', opinion: '-', issuer: '토스증권', date: '2026.10.28', url: 'https://corp.tossinvest.com/ko/investment-info' },
+      { cat: '시장', stock: '', title: 'Next Weekly Issue Check-26.10.17', target: '-', opinion: '-', issuer: '넥스트증권', date: '2026.10.19', url: 'https://www.next-securities.com/board/boardList.do?content=4000194&searchType=&bbsCategory=DR03&searchValue=' }
+    ];
+
     const FREE_21_FIRMS = [
       { id: 'ds', name: 'DS투자증권', naver: true, status: 'naver', url: 'https://www.ds-sec.co.kr/bbs/board.php?bo_table=sub03_02', cats: ['국내종목', '산업분석', '투자전략'], note: '기업분석 게시판 2,575건 무료 열람 및 PDF 첨부' },
       { id: 'kyobo', name: '교보증권', naver: true, status: 'naver', url: 'https://www.iprovest.com/weblogic/RSReportServlet?scr_id=10&menuCode=1&srch_db=0&QU=&DT1=&DT2=&provestz=&pageNum=3', cats: ['데일리', '국내종목', '산업분석', '투자전략', '경제분석'], note: 'PC·모바일 목록 및 PDF 원문 무료 열람' },
@@ -361,14 +560,14 @@
       { id: 'toss', name: '토스증권', url: 'https://corp.tossinvest.com/ko/investment-info' }
     ];
 
-    const STORAGE_KEY = 'morning_research_hub_v1';
+    const STORAGE_KEY = 'morning_research_hub_v2';
 
     function loadState() {
       try {
         const raw = localStorage.getItem(STORAGE_KEY);
         if (raw) return JSON.parse(raw);
       } catch (e) {}
-      return { checked: {}, favs: ['next', 'toss'], memos: [] };
+      return { checked: {}, favs: ['next', 'toss'], memos: [], customReports: [] };
     }
 
     function saveState() {
@@ -378,7 +577,17 @@
     }
 
     let state = loadState();
-    let currentTab = 'launchpad';
+    if (!Array.isArray(state.customReports)) state.customReports = [];
+    let currentTab = 'feed';
+    let feedCat = '전체';
+    let feedDate = 'all';
+    let feedOpinion = 'all';
+    let feedIssuer = 'all';
+    let feedStock = '';
+    let feedQueryScope = 'all';
+    let feedQuery = '';
+    let feedLimit = 50;
+
     let sourceFilter = 'all';
     let catFilter = 'all';
     let search21 = '';
@@ -392,6 +601,73 @@
       toast.classList.remove('hidden');
       clearTimeout(toast._timer);
       toast._timer = setTimeout(() => toast.classList.add('hidden'), 2400);
+    }
+
+    function getAllReports() {
+      return [...state.customReports, ...INITIAL_REPORTS].sort((a, b) => b.date.localeCompare(a.date));
+    }
+
+    function populateIssuerDropdown() {
+      const sel = document.getElementById('feed-issuer-filter');
+      const issuers = Array.from(new Set(getAllReports().map(r => r.issuer))).sort();
+      const prev = sel.value;
+      sel.innerHTML = '<option value="all">전체</option>' + issuers.map(iss => `<option value="${iss}">${iss}</option>`).join('');
+      if (issuers.includes(prev)) sel.value = prev;
+    }
+
+    function renderFeed() {
+      const tbody = document.getElementById('feed-tbody');
+      const all = getAllReports();
+      const stockQ = feedStock.trim().toLowerCase();
+      const q = feedQuery.trim().toLowerCase();
+
+      const filtered = all.filter(r => {
+        if (feedCat !== '전체' && r.cat !== feedCat) return false;
+        if (feedDate === 'today' && r.date !== '2026.11.24') return false;
+        if (feedDate === '7d' && r.date < '2026.11.17') return false;
+        if (feedDate === '30d' && r.date < '2026.10.25') return false;
+        if (feedOpinion === 'buy' && !/buy|매수/i.test(r.opinion)) return false;
+        if (feedOpinion === 'none' && /buy|매수/i.test(r.opinion)) return false;
+        if (feedIssuer !== 'all' && r.issuer !== feedIssuer) return false;
+        if (stockQ && !`${r.stock} ${r.title}`.toLowerCase().includes(stockQ)) return false;
+        if (q) {
+          if (feedQueryScope === 'title' && !r.title.toLowerCase().includes(q)) return false;
+          else if (feedQueryScope === 'issuer' && !r.issuer.toLowerCase().includes(q)) return false;
+          else if (feedQueryScope === 'all' && !`${r.title} ${r.issuer} ${r.stock}`.toLowerCase().includes(q)) return false;
+        }
+        return true;
+      });
+
+      document.getElementById('feed-count').textContent = String(filtered.length);
+      const shown = filtered.slice(0, feedLimit);
+
+      if (shown.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="5" class="py-10 text-center text-sm text-slate-400">조건에 맞는 리포트가 없습니다.</td></tr>';
+        return;
+      }
+
+      const catStyle = {
+        '기업': 'bg-emerald-600 text-white',
+        '산업': 'bg-purple-600 text-white',
+        '시장': 'bg-rose-600 text-white',
+        '경제': 'bg-blue-600 text-white',
+        '파생': 'bg-amber-600 text-white'
+      };
+
+      tbody.innerHTML = shown.map(r => `
+        <tr class="hover:bg-slate-50/90 transition-colors">
+          <td class="py-3 pl-4 pr-3">
+            <div class="flex items-center gap-2.5">
+              <span class="inline-flex shrink-0 items-center rounded px-2 py-0.5 text-[11px] font-bold ${catStyle[r.cat] || 'bg-slate-600 text-white'}">${r.cat}</span>
+              <a href="${r.url}" target="_blank" rel="noopener noreferrer" class="font-medium text-slate-900 hover:text-blue-700 hover:underline">${r.title.replace(/</g, '&lt;')}</a>
+            </div>
+          </td>
+          <td class="py-3 px-3 text-right font-medium text-slate-700 whitespace-nowrap">${r.target}</td>
+          <td class="py-3 px-3 text-xs font-semibold ${/buy|매수/i.test(r.opinion) ? 'text-rose-600' : 'text-slate-400'} whitespace-nowrap">${r.opinion}</td>
+          <td class="py-3 px-3 text-slate-700 whitespace-nowrap">${r.issuer}</td>
+          <td class="py-3 pl-3 pr-4 text-right font-mono text-xs text-slate-500 whitespace-nowrap">${r.date}</td>
+        </tr>
+      `).join('');
     }
 
     function updateProgress() {
@@ -597,10 +873,12 @@
 
     function switchTab(tab) {
       currentTab = tab;
+      document.getElementById('view-feed').classList.toggle('hidden', tab !== 'feed');
       document.getElementById('view-launchpad').classList.toggle('hidden', tab !== 'launchpad');
       document.getElementById('view-free21').classList.toggle('hidden', tab !== 'free21');
       document.getElementById('view-directory60').classList.toggle('hidden', tab !== 'directory60');
 
+      document.getElementById('tab-feed').setAttribute('aria-selected', String(tab === 'feed'));
       document.getElementById('tab-launchpad').setAttribute('aria-selected', String(tab === 'launchpad'));
       document.getElementById('tab-free21').setAttribute('aria-selected', String(tab === 'free21'));
       document.getElementById('tab-directory60').setAttribute('aria-selected', String(tab === 'directory60'));
@@ -608,11 +886,99 @@
       if (tab === 'directory60') renderChart();
     }
 
-    // Event bindings
+    // Tab switches
+    document.getElementById('tab-feed').addEventListener('click', () => switchTab('feed'));
     document.getElementById('tab-launchpad').addEventListener('click', () => switchTab('launchpad'));
     document.getElementById('tab-free21').addEventListener('click', () => switchTab('free21'));
     document.getElementById('tab-directory60').addEventListener('click', () => switchTab('directory60'));
 
+    // Feed events
+    document.querySelectorAll('[data-feed-cat]').forEach(btn => {
+      btn.addEventListener('click', () => {
+        feedCat = btn.getAttribute('data-feed-cat');
+        document.querySelectorAll('[data-feed-cat]').forEach(b => b.setAttribute('aria-pressed', String(b === btn)));
+        renderFeed();
+      });
+    });
+
+    document.getElementById('feed-date-filter').addEventListener('change', (e) => {
+      feedDate = e.target.value;
+      renderFeed();
+    });
+
+    document.getElementById('feed-opinion-filter').addEventListener('change', (e) => {
+      feedOpinion = e.target.value;
+      renderFeed();
+    });
+
+    document.getElementById('feed-issuer-filter').addEventListener('change', (e) => {
+      feedIssuer = e.target.value;
+      renderFeed();
+    });
+
+    document.getElementById('feed-stock-input').addEventListener('input', (e) => {
+      feedStock = e.target.value;
+      renderFeed();
+    });
+
+    document.getElementById('feed-query-input').addEventListener('input', (e) => {
+      feedQuery = e.target.value;
+      renderFeed();
+    });
+
+    document.getElementById('feed-query-scope').addEventListener('change', (e) => {
+      feedQueryScope = e.target.value;
+      renderFeed();
+    });
+
+    document.getElementById('feed-search-form').addEventListener('submit', (e) => {
+      e.preventDefault();
+      feedStock = document.getElementById('feed-stock-input').value;
+      feedQuery = document.getElementById('feed-query-input').value;
+      renderFeed();
+    });
+
+    document.getElementById('feed-limit-select').addEventListener('change', (e) => {
+      feedLimit = Number(e.target.value);
+      renderFeed();
+    });
+
+    // Add report modal
+    const modal = document.getElementById('add-report-modal');
+    document.getElementById('open-add-report-btn').addEventListener('click', () => {
+      modal.classList.remove('hidden');
+      modal.classList.add('flex');
+    });
+    document.getElementById('close-add-report-btn').addEventListener('click', () => {
+      modal.classList.add('hidden');
+      modal.classList.remove('flex');
+    });
+    document.getElementById('add-report-form').addEventListener('submit', (e) => {
+      e.preventDefault();
+      const newRep = {
+        cat: document.getElementById('new-cat').value,
+        date: document.getElementById('new-date').value.trim() || '2026.11.24',
+        title: document.getElementById('new-title').value.trim(),
+        stock: '',
+        target: document.getElementById('new-target').value.trim() || '-',
+        opinion: document.getElementById('new-opinion').value.trim() || '-',
+        issuer: document.getElementById('new-issuer').value.trim(),
+        url: document.getElementById('new-url').value.trim()
+      };
+      if (!newRep.title || !newRep.issuer) return;
+      state.customReports.unshift(newRep);
+      saveState();
+      populateIssuerDropdown();
+      renderFeed();
+      document.getElementById('add-report-form').reset();
+      document.getElementById('new-date').value = '2026.11.24';
+      document.getElementById('new-url').value = 'https://stock.naver.com/research';
+      modal.classList.add('hidden');
+      modal.classList.remove('flex');
+      showToast('새 리포트를 목록 맨 위에 추가했습니다.');
+    });
+
+    // Existing events
     document.getElementById('reset-checks-btn').addEventListener('click', () => {
       state.checked = {};
       saveState();
@@ -731,6 +1097,8 @@
     });
 
     // Initial render
+    populateIssuerDropdown();
+    renderFeed();
     updateProgress();
     renderDirect4();
     renderFree21();
